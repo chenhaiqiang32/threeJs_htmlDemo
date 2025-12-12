@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 模型爆炸功能演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            min-width: 280px;
+            backdrop-filter: blur(10px);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .direction-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .slider-container {
+            position: relative;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
+        }
+
+        .value-display {
+            text-align: center;
+            margin-top: 8px;
+            color: #667eea;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .action-buttons button {
+            flex: 1;
+        }
+
+        button.reset {
+            background: #ff6b6b;
+            border-color: #ff6b6b;
+            color: white;
+        }
+
+        button.reset:hover {
+            background: #ff5252;
+            border-color: #ff5252;
+        }
+
+        #info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            max-width: 300px;
+        }
+
+        .rotation-controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .rotation-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="canvas-container"></div>
+        
+        <div id="controls">
+            <h2>🎯 爆炸控制</h2>
+            
+            <div class="control-group">
+                <label>展开方向</label>
+                <div class="direction-buttons">
+                    <button id="dir-x" class="active">X 轴</button>
+                    <button id="dir-y">Y 轴</button>
+                    <button id="dir-z">Z 轴</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label>爆炸强度: <span id="value-display">0.0</span></label>
+                <div class="slider-container">
+                    <input type="range" id="expand-slider" min="0" max="2" step="0.01" value="0">
+                </div>
+            </div>
+
+            <div class="control-group rotation-controls">
+                <label>模型旋转</label>
+                <div class="rotation-buttons">
+                    <button id="rotate-x">绕 X 旋转</button>
+                    <button id="rotate-y">绕 Y 旋转</button>
+                    <button id="rotate-z">绕 Z 旋转</button>
+                    <button id="reset-rotation">重置旋转</button>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button id="reset-btn" class="reset">重置模型</button>
+            </div>
+        </div>
+
+        <div id="info">
+            <strong>操作提示：</strong><br>
+            • 鼠标左键拖拽：旋转视角<br>
+            • 鼠标右键拖拽：平移<br>
+            • 滚轮：缩放<br>
+            • 选择方向后调整滑块查看爆炸效果
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf0f0f0);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 添加灯光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight1.position.set(5, 5, 5);
+        directionalLight1.castShadow = true;
+        scene.add(directionalLight1);
+
+        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+        directionalLight2.position.set(-5, -5, -5);
+        scene.add(directionalLight2);
+
+        // 创建模型组
+        const modelGroup = new THREE.Group();
+        modelGroup.name = 'ModelGroup';
+        scene.add(modelGroup);
+
+        // 创建多个几何体作为模型部件
+        const meshes = [];
+        const colors = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xffa07a, 0x98d8c8, 0xf7dc6f, 0xbb8fce, 0x85c1e2];
+        
+        // 创建一个复合模型（类似真实场景）
+        function createModel() {
+            modelGroup.clear();
+            meshes.length = 0;
+
+            // 创建多个部件
+            const positions = [
+                { x: -1, y: 0, z: 0, size: 0.5 },
+                { x: 1, y: 0, z: 0, size: 0.5 },
+                { x: 0, y: 1, z: 0, size: 0.4 },
+                { x: 0, y: -1, z: 0, size: 0.4 },
+                { x: 0, y: 0, z: 1, size: 0.5 },
+                { x: 0, y: 0, z: -1, size: 0.5 },
+                { x: -0.5, y: 0.5, z: 0.5, size: 0.3 },
+                { x: 0.5, y: -0.5, z: -0.5, size: 0.3 },
+            ];
+
+            positions.forEach((pos, index) => {
+                const geometry = new THREE.BoxGeometry(pos.size, pos.size, pos.size);
+                const material = new THREE.MeshStandardMaterial({
+                    color: colors[index % colors.length],
+                    metalness: 0.3,
+                    roughness: 0.4
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(pos.x, pos.y, pos.z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                
+                // 保存初始位置
+                mesh.userData.initPos = mesh.position.clone();
+                
+                modelGroup.add(mesh);
+                meshes.push(mesh);
+            });
+
+            // 计算中心点
+            const box = new THREE.Box3().setFromObject(modelGroup);
+            const center = box.getCenter(new THREE.Vector3());
+            scene.userData.center = center;
+
+            // 处理每个 mesh，设置 expandTarget 和 offset（模拟 processModel 函数）
+            meshes.forEach(mesh => {
+                const meshBox = new THREE.Box3().setFromObject(mesh);
+                const worldPos = meshBox.getCenter(new THREE.Vector3());
+                mesh.userData.expandTarget = worldPos.clone();
+                mesh.updateMatrixWorld();
+                const worldPosition = new THREE.Vector3();
+                mesh.getWorldPosition(worldPosition);
+                mesh.userData.offset = worldPosition.sub(worldPos);
+            });
+        }
+
+        // 爆炸功能实现（基于原代码）
+        function setExpandValue(dir, value) {
+            // 获取主模型（Group）的当前旋转状态
+            const model = scene.children.find(child => child.type === 'Group');
+            let modelRotation = null;
+            if (model) {
+                model.updateMatrixWorld();
+                modelRotation = new THREE.Quaternion();
+                model.getWorldQuaternion(modelRotation);
+            }
+
+            let vector;
+            switch (dir) {
+                case 'x':
+                    vector = new THREE.Vector3(1, 0, 0);
+                    break;
+                case 'y':
+                    vector = new THREE.Vector3(0, 1, 0);
+                    break;
+                case 'z':
+                    vector = new THREE.Vector3(0, 0, 1);
+                    break;
+            }
+
+            // 如果模型已旋转，将方向向量转换到模型旋转后的空间
+            if (modelRotation && vector) {
+                vector.applyQuaternion(modelRotation);
+            }
+
+            const center = scene.userData.center;
+            
+            meshes.forEach(mesh => {
+                const objectCenter = mesh.userData.expandTarget;
+                const offset = mesh.userData.offset || new THREE.Vector3();
+                
+                if (!objectCenter) {
+                    return;
+                }
+
+                // 将 objectCenter 和 offset 从初始状态转换到当前旋转后的状态
+                let transformedCenter = objectCenter.clone();
+                let transformedOffset = offset ? offset.clone() : new THREE.Vector3();
+
+                if (modelRotation) {
+                    // 计算相对于中心的偏移
+                    const centerOffset = transformedCenter.clone().sub(center);
+                    // 应用旋转
+                    centerOffset.applyQuaternion(modelRotation);
+                    // 转换回世界空间
+                    transformedCenter = center.clone().add(centerOffset);
+
+                    // 同样处理 mesh 的 offset
+                    transformedOffset.applyQuaternion(modelRotation);
+                }
+
+                const v = transformedCenter.clone().sub(center);
+                let moveDir = v.clone();
+                let length = 0;
+                if (!vector) {
+                    length = v.length();
+                } else {
+                    length = v.dot(vector);
+                    v.copy(vector);
+                }
+                const targetPos = moveDir.add(v.setLength(value * length)).add(center).add(transformedOffset);
+                const pos = mesh.parent.worldToLocal(targetPos);
+                mesh.position.copy(pos);
+            });
+        }
+
+        // 重置模型位置
+        function resetModel() {
+            meshes.forEach(mesh => {
+                if (mesh.userData.initPos) {
+                    mesh.position.copy(mesh.userData.initPos);
+                }
+            });
+        }
+
+        // 初始化模型
+        createModel();
+
+        // UI 控制
+        let currentDir = 'x';
+        let currentValue = 0;
+
+        // 方向按钮
+        document.getElementById('dir-x').addEventListener('click', () => {
+            currentDir = 'x';
+            updateDirectionButtons();
+            setExpandValue(currentDir, currentValue);
+        });
+        document.getElementById('dir-y').addEventListener('click', () => {
+            currentDir = 'y';
+            updateDirectionButtons();
+            setExpandValue(currentDir, currentValue);
+        });
+        document.getElementById('dir-z').addEventListener('click', () => {
+            currentDir = 'z';
+            updateDirectionButtons();
+            setExpandValue(currentDir, currentValue);
+        });
+
+        function updateDirectionButtons() {
+            document.querySelectorAll('.direction-buttons button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`dir-${currentDir}`).classList.add('active');
+        }
+
+        // 滑块控制
+        const slider = document.getElementById('expand-slider');
+        const valueDisplay = document.getElementById('value-display');
+        
+        slider.addEventListener('input', (e) => {
+            currentValue = parseFloat(e.target.value);
+            valueDisplay.textContent = currentValue.toFixed(2);
+            setExpandValue(currentDir, currentValue);
+        });
+
+        // 重置按钮
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            currentValue = 0;
+            slider.value = 0;
+            valueDisplay.textContent = '0.00';
+            resetModel();
+        });
+
+        // 旋转控制
+        document.getElementById('rotate-x').addEventListener('click', () => {
+            modelGroup.rotateX(Math.PI / 4);
+            setExpandValue(currentDir, currentValue);
+        });
+        document.getElementById('rotate-y').addEventListener('click', () => {
+            modelGroup.rotateY(Math.PI / 4);
+            setExpandValue(currentDir, currentValue);
+        });
+        document.getElementById('rotate-z').addEventListener('click', () => {
+            modelGroup.rotateZ(Math.PI / 4);
+            setExpandValue(currentDir, currentValue);
+        });
+        document.getElementById('reset-rotation').addEventListener('click', () => {
+            modelGroup.rotation.set(0, 0, 0);
+            setExpandValue(currentDir, currentValue);
+        });
+
+        // 添加网格和坐标轴辅助
+        const gridHelper = new THREE.GridHelper(10, 10);
+        scene.add(gridHelper);
+
+        const axesHelper = new THREE.AxesHelper(2);
+        scene.add(axesHelper);
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

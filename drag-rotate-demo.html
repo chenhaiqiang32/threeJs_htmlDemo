@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拖拽翻转 Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 100;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        #info h2 {
+            margin-bottom: 10px;
+            color: #4CAF50;
+        }
+        
+        #info ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        #info li {
+            margin: 5px 0;
+        }
+        
+        #info li::before {
+            content: "• ";
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        
+        canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="info">
+            <h2>拖拽翻转功能演示</h2>
+            <ul>
+                <li>在空白区域点击并拖动：旋转模型</li>
+                <li>水平拖动：绕相机上向量旋转</li>
+                <li>垂直拖动：绕相机右向量旋转</li>
+                <li>快速点击（无拖动）：根据点击位置旋转45度</li>
+            </ul>
+        </div>
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x2a2a2a);
+
+        // 相机设置
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+
+        // 渲染器设置
+        const canvas = document.getElementById('canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // 创建测试模型（一个组合体，包含多个立方体）
+        const modelGroup = new THREE.Group();
+        
+        // 主立方体
+        const mainGeometry = new THREE.BoxGeometry(2, 2, 2);
+        const mainMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x4CAF50,
+            metalness: 0.7,
+            roughness: 0.3
+        });
+        const mainCube = new THREE.Mesh(mainGeometry, mainMaterial);
+        modelGroup.add(mainCube);
+
+        // 添加一些装饰性小立方体
+        const colors = [0xFF6B6B, 0x4ECDC4, 0x45B7D1, 0xFFA07A];
+        for (let i = 0; i < 4; i++) {
+            const smallGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+            const smallMaterial = new THREE.MeshStandardMaterial({ 
+                color: colors[i],
+                metalness: 0.5,
+                roughness: 0.5
+            });
+            const smallCube = new THREE.Mesh(smallGeometry, smallMaterial);
+            const angle = (Math.PI * 2 * i) / 4;
+            smallCube.position.set(
+                Math.cos(angle) * 1.5,
+                Math.sin(angle) * 1.5,
+                0
+            );
+            modelGroup.add(smallCube);
+        }
+
+        scene.add(modelGroup);
+
+        // 添加灯光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight1.position.set(5, 5, 5);
+        scene.add(directionalLight1);
+
+        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+        directionalLight2.position.set(-5, -5, -5);
+        scene.add(directionalLight2);
+
+        // 添加网格辅助
+        const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        const axesHelper = new THREE.AxesHelper(3);
+        scene.add(axesHelper);
+
+        // 简化的相机控制器（仅用于缩放和平移，不用于旋转）
+        const controls = new OrbitControls(camera, canvas);
+        controls.enableRotate = false; // 禁用相机旋转，因为我们要旋转物体
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // 获取容器矩形信息
+        function getRect() {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                width: rect.width,
+                height: rect.height,
+                x: rect.x,
+                y: rect.y,
+                left: rect.left,
+                top: rect.top
+            };
+        }
+
+        // 使用 Three.js 内置的 Raycaster
+        const raycaster = new THREE.Raycaster();
+
+        // 拖拽旋转控制类
+        class DragRotateControl {
+            constructor(dom, camera, scene, rect) {
+                this.dom = dom;
+                this.camera = camera;
+                this.scene = scene;
+                this.rect = rect;
+                this.raycaster = raycaster;
+                
+                // 状态变量
+                this.clickStartX = 0;
+                this.clickStartY = 0;
+                this.isDragging = false;
+                this.lastDragX = 0;
+                this.lastDragY = 0;
+                
+                // 常量
+                this.ROTATION_ANGLE = Math.PI / 4; // 45度旋转角度（点击时）
+                this.DRAG_ROTATION_SPEED = 0.01; // 拖动旋转速度
+                
+                // 绑定事件处理函数
+                this.onPointerDown = this.onPointerDown.bind(this);
+                this.onPointerMove = this.onPointerMove.bind(this);
+                this.onPointerUp = this.onPointerUp.bind(this);
+                
+                // 添加事件监听
+                this.dom.addEventListener('pointerdown', this.onPointerDown);
+                this.dom.addEventListener('pointermove', this.onPointerMove);
+                this.dom.addEventListener('pointerup', this.onPointerUp);
+            }
+
+            // 鼠标按下事件
+            onPointerDown(e) {
+                if (e.button !== 0) return; // 只处理左键
+                
+                // 检查是否点击在物体上（检查是否点击在模型组或其子对象上）
+                const result = this.pickObject({ x: e.clientX, y: e.clientY }, [modelGroup]);
+                
+                // 如果点击在空白区域，开始拖动旋转
+                if (!result || !this.isModelOrChild(result.object)) {
+                    this.clickStartX = e.clientX;
+                    this.clickStartY = e.clientY;
+                    this.lastDragX = e.clientX;
+                    this.lastDragY = e.clientY;
+                    this.isDragging = true;
+                }
+            }
+
+            // 检查对象是否是模型组或其子对象
+            isModelOrChild(object) {
+                let current = object;
+                while (current) {
+                    if (current === modelGroup) {
+                        return true;
+                    }
+                    current = current.parent;
+                }
+                return false;
+            }
+
+            // 鼠标移动事件 - 拖动时旋转物体
+            onPointerMove(e) {
+                if (!this.isDragging) return;
+                
+                // 只处理左键拖动
+                if ((e.buttons & 1) === 0) {
+                    this.isDragging = false;
+                    return;
+                }
+                
+                // 计算拖动增量
+                const deltaX = e.clientX - this.lastDragX;
+                const deltaY = e.clientY - this.lastDragY;
+                
+                // 如果移动距离很小，不处理
+                if (Math.abs(deltaX) < 0.5 && Math.abs(deltaY) < 0.5) return;
+                
+                // 计算模型中心
+                const box = new THREE.Box3().setFromObject(modelGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                
+                // 获取相机的右向量和上向量
+                this.camera.updateMatrixWorld();
+                const cameraRight = new THREE.Vector3();
+                cameraRight.setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+                const cameraUp = new THREE.Vector3();
+                cameraUp.setFromMatrixColumn(this.camera.matrixWorld, 1).normalize();
+                
+                // 水平拖动旋转
+                if (Math.abs(deltaX) > 0.5) {
+                    const horizontalAxis = deltaX > 0 ? cameraUp.clone() : cameraUp.clone().negate();
+                    const horizontalAngle = Math.abs(deltaX) * this.DRAG_ROTATION_SPEED;
+                    this.rotateObjectAroundCenter(modelGroup, center, horizontalAxis, horizontalAngle, false);
+                }
+                
+                // 垂直拖动旋转
+                if (Math.abs(deltaY) > 0.5) {
+                    const verticalAxis = deltaY > 0 ? cameraRight.clone() : cameraRight.clone().negate();
+                    const verticalAngle = Math.abs(deltaY) * this.DRAG_ROTATION_SPEED;
+                    this.rotateObjectAroundCenter(modelGroup, center, verticalAxis, verticalAngle, false);
+                }
+                
+                // 更新最后拖动位置
+                this.lastDragX = e.clientX;
+                this.lastDragY = e.clientY;
+            }
+
+            // 鼠标抬起事件 - 检测点击位置并旋转物体
+            onPointerUp(e) {
+                if (e.button !== 0) return; // 只处理左键抬起
+                
+                if (!this.isDragging) return;
+                
+                const deltaX = e.clientX - this.clickStartX;
+                const deltaY = e.clientY - this.clickStartY;
+                
+                // 如果移动距离很小，认为是点击而不是拖拽
+                if (Math.abs(deltaX) < 5 && Math.abs(deltaY) < 5) {
+                    this.handleClickRotation(e.clientX, e.clientY);
+                }
+                
+                // 结束拖动
+                this.isDragging = false;
+            }
+
+            // 处理点击旋转
+            handleClickRotation(clientX, clientY) {
+                // 获取视口中心
+                const centerX = this.rect.left + this.rect.width / 2;
+                const centerY = this.rect.top + this.rect.height / 2;
+                
+                // 计算点击位置相对于视口中心的位置
+                const dx = clientX - centerX;
+                const dy = clientY - centerY;
+                
+                // 判断点击方向（前后左右）
+                const absDx = Math.abs(dx);
+                const absDy = Math.abs(dy);
+                
+                // 计算模型中心
+                const box = new THREE.Box3().setFromObject(modelGroup);
+                const center = box.getCenter(new THREE.Vector3());
+                
+                // 获取相机的右向量和上向量
+                this.camera.updateMatrixWorld();
+                const cameraRight = new THREE.Vector3();
+                cameraRight.setFromMatrixColumn(this.camera.matrixWorld, 0).normalize();
+                const cameraUp = new THREE.Vector3();
+                cameraUp.setFromMatrixColumn(this.camera.matrixWorld, 1).normalize();
+                
+                let rotationAxis;
+                
+                // 根据点击位置确定旋转轴
+                if (absDx > absDy) {
+                    // 左右方向
+                    if (dx > 0) {
+                        // 右 - 绕上向量旋转
+                        rotationAxis = cameraUp.clone();
+                    } else {
+                        // 左 - 绕上向量反向旋转
+                        rotationAxis = cameraUp.clone().negate();
+                    }
+                } else {
+                    // 前后方向
+                    if (dy > 0) {
+                        // 下（前）- 绕右向量旋转
+                        rotationAxis = cameraRight.clone();
+                    } else {
+                        // 上（后）- 绕右向量反向旋转
+                        rotationAxis = cameraRight.clone().negate();
+                    }
+                }
+                
+                // 旋转物体
+                this.rotateObjectAroundCenter(modelGroup, center, rotationAxis, this.ROTATION_ANGLE);
+            }
+
+            // 围绕中心旋转物体
+            rotateObjectAroundCenter(object, center, axis, angle, updatePosition = true) {
+                // 更新世界矩阵
+                object.updateMatrixWorld();
+                
+                // 创建旋转四元数（在世界空间中）
+                const rotationQuaternion = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+                
+                // 如果需要更新位置（围绕中心旋转）
+                if (updatePosition) {
+                    // 获取物体的世界位置
+                    const worldPosition = new THREE.Vector3();
+                    object.getWorldPosition(worldPosition);
+                    
+                    // 计算相对于旋转中心的偏移
+                    const offset = worldPosition.clone().sub(center);
+                    
+                    // 应用旋转到偏移向量
+                    offset.applyQuaternion(rotationQuaternion);
+                    
+                    // 计算新的世界位置
+                    const newWorldPosition = center.clone().add(offset);
+                    
+                    // 转换到本地空间
+                    if (object.parent) {
+                        object.parent.updateMatrixWorld();
+                        const parentInverseMatrix = new THREE.Matrix4();
+                        parentInverseMatrix.copy(object.parent.matrixWorld).invert();
+                        const localPosition = newWorldPosition.clone().applyMatrix4(parentInverseMatrix);
+                        object.position.copy(localPosition);
+                    } else {
+                        object.position.copy(newWorldPosition);
+                    }
+                }
+                
+                // 应用旋转到物体的四元数
+                // 在世界空间中旋转，需要转换到本地空间
+                if (object.parent) {
+                    object.parent.updateMatrixWorld();
+                    // 将世界空间的旋转转换到父节点的本地空间
+                    const parentQuaternion = new THREE.Quaternion();
+                    parentQuaternion.setFromRotationMatrix(object.parent.matrixWorld);
+                    // 将旋转转换到父节点的本地空间
+                    const localRotation = parentQuaternion.clone().invert().multiply(rotationQuaternion).multiply(parentQuaternion);
+                    object.quaternion.premultiply(localRotation);
+                } else {
+                    // 没有父节点，直接在世界空间中旋转
+                    object.quaternion.multiply(rotationQuaternion);
+                }
+                object.quaternion.normalize();
+            }
+
+            // 拾取物体
+            pickObject(pos, objects) {
+                const rect = getRect();
+                const x = pos.x - rect.left;
+                const y = pos.y - rect.top;
+                const mouse = new THREE.Vector2();
+                mouse.x = (x / rect.width) * 2 - 1;
+                mouse.y = -(y / rect.height) * 2 + 1;
+                
+                this.raycaster.setFromCamera(mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(objects, true);
+                return intersects.length > 0 ? intersects[0] : null;
+            }
+
+            // 更新矩形信息
+            updateRect() {
+                this.rect = getRect();
+            }
+
+            // 清理
+            dispose() {
+                this.dom.removeEventListener('pointerdown', this.onPointerDown);
+                this.dom.removeEventListener('pointermove', this.onPointerMove);
+                this.dom.removeEventListener('pointerup', this.onPointerUp);
+            }
+        }
+
+        // 创建拖拽旋转控制
+        const dragControl = new DragRotateControl(canvas, camera, scene, getRect());
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // 窗口大小调整
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            dragControl.updateRect();
+        });
+
+        // 添加一些动画效果
+        let time = 0;
+        function addRotationAnimation() {
+            time += 0.01;
+            // 可以在这里添加自动旋转或其他动画效果
+        }
+
+        // 将动画函数添加到循环中（可选）
+        // setInterval(addRotationAnimation, 16);
+    </script>
+</body>
+</html>
