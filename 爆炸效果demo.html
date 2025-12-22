@@ -274,6 +274,25 @@
         modelGroup.name = 'ModelGroup';
         scene.add(modelGroup);
 
+        // 创建旋转轴可视化辅助器
+        let axisHelper = null;
+        function createAxisHelper() {
+            if (axisHelper) {
+                scene.remove(axisHelper);
+            }
+            axisHelper = new THREE.ArrowHelper(
+                new THREE.Vector3(1, 0, 0), // 方向
+                new THREE.Vector3(0, 0, 0), // 起点
+                3, // 长度
+                0xff0000, // 颜色（红色）
+                0.3, // 头部长度
+                0.15 // 头部宽度
+            );
+            axisHelper.name = 'RotatedAxisHelper';
+            scene.add(axisHelper);
+        }
+        createAxisHelper();
+
         // 创建多个几何体作为模型部件
         const meshes = [];
         const colors = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xffa07a, 0x98d8c8, 0xf7dc6f, 0xbb8fce, 0x85c1e2];
@@ -354,12 +373,46 @@
                     vector = new THREE.Vector3(0, 0, 1);
                     break;
             }
-
+            
             // 如果模型已旋转，将方向向量转换到模型旋转后的空间
             if (modelRotation && vector) {
                 vector.applyQuaternion(modelRotation);
             }
-
+            
+            // 更新旋转轴可视化
+            if (vector) {
+                const center = scene.userData.center || new THREE.Vector3(0, 0, 0);
+                const normalizedDir = vector.clone().normalize();
+                
+                // 移除旧的箭头
+                if (axisHelper) {
+                    scene.remove(axisHelper);
+                    axisHelper = null;
+                }
+                console.log(normalizedDir,dir,value, 4444888888888);
+                // 根据方向设置颜色
+                let arrowColor = 0xff0000; // 默认红色
+                if (dir === 'x') {
+                    arrowColor = 0xff0000; // 红色
+                } else if (dir === 'y') {
+                    arrowColor = 0x00ff00; // 绿色
+                } else if (dir === 'z') {
+                    arrowColor = 0x0000ff; // 蓝色
+                }
+                
+                // 创建新的箭头，显示旋转后的方向
+                axisHelper = new THREE.ArrowHelper(
+                    normalizedDir, // 旋转后的方向
+                    center, // 起点（模型中心）
+                    3, // 长度
+                    arrowColor, // 颜色
+                    0.3, // 头部长度
+                    0.15 // 头部宽度
+                );
+                axisHelper.name = 'RotatedAxisHelper';
+                scene.add(axisHelper);
+            }
+            
             const center = scene.userData.center;
             
             meshes.forEach(mesh => {
@@ -416,6 +469,9 @@
         // UI 控制
         let currentDir = 'x';
         let currentValue = 0;
+        
+        // 初始化箭头显示
+        setExpandValue(currentDir, currentValue);
 
         // 方向按钮
         document.getElementById('dir-x').addEventListener('click', () => {
@@ -462,15 +518,15 @@
         // 旋转控制
         document.getElementById('rotate-x').addEventListener('click', () => {
             modelGroup.rotateX(Math.PI / 4);
-            setExpandValue(currentDir, currentValue);
+            setExpandValue('x', currentValue);
         });
         document.getElementById('rotate-y').addEventListener('click', () => {
             modelGroup.rotateY(Math.PI / 4);
-            setExpandValue(currentDir, currentValue);
+            setExpandValue('y', currentValue);
         });
         document.getElementById('rotate-z').addEventListener('click', () => {
             modelGroup.rotateZ(Math.PI / 4);
-            setExpandValue(currentDir, currentValue);
+            setExpandValue('z', currentValue);
         });
         document.getElementById('reset-rotation').addEventListener('click', () => {
             modelGroup.rotation.set(0, 0, 0);
