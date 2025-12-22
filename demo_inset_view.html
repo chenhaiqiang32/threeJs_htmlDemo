@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+	<head>
+		<title>小窗口视角演示 - Inset View Demo</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				overflow: hidden;
+				font-family: Arial, sans-serif;
+				background: #000;
+			}
+			#container {
+				width: 100vw;
+				height: 100vh;
+				position: relative;
+			}
+			#info {
+				position: absolute;
+				top: 10px;
+				left: 10px;
+				color: white;
+				font-size: 14px;
+				z-index: 100;
+				background: rgba(0, 0, 0, 0.5);
+				padding: 10px;
+				border-radius: 4px;
+			}
+			#info h3 {
+				margin: 0 0 8px 0;
+			}
+			#info p {
+				margin: 4px 0;
+				font-size: 12px;
+			}
+			#crosshair {
+				position: absolute;
+				width: 32px;
+				height: 32px;
+				pointer-events: none;
+				z-index: 1000;
+				display: none;
+				transform: translate(-50%, -50%);
+			}
+			#crosshair::before {
+				content: '';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				width: 32px;
+				height: 32px;
+				transform: translate(-50%, -50%);
+				border: 2px solid #ff8800;
+				border-radius: 50%;
+				box-shadow: 0 0 4px rgba(255, 136, 0, 0.8);
+			}
+			#crosshair::after {
+				content: '+';
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				color: #ff8800;
+				font-size: 20px;
+				font-weight: bold;
+				text-shadow: 0 0 4px rgba(255, 136, 0, 0.8);
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="container"></div>
+		<div id="info">
+			<h3>小窗口视角演示</h3>
+			<p>移动鼠标到模型上查看局部放大视图</p>
+			<p>小窗口显示在右上角</p>
+			<p>缩放比例: 8x</p>
+		</div>
+		<div id="crosshair"></div>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+				}
+			}
+		</script>
+
+		<script type="module">
+			import * as THREE from 'three';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+			// 场景、相机、渲染器
+			let scene, mainCamera, insetCamera, renderer, controls;
+			let meshes = [];
+			let raycaster = new THREE.Raycaster();
+			let mouse = new THREE.Vector2();
+			
+			// 小窗口相关状态
+			let showInset = false;
+			let hoveredIntersection = null;
+			let insetSize = 0;
+			let insetX = 0;
+			let insetY = 0;
+			let crosshairElement = document.getElementById('crosshair');
+			
+			// 缩放因子
+			const insetZoomFactor = 8;
+
+			// 初始化
+			function init() {
+				// 创建渲染器
+				renderer = new THREE.WebGLRenderer({ antialias: true });
+				renderer.setPixelRatio(window.devicePixelRatio);
+				renderer.setSize(window.innerWidth, window.innerHeight);
+				renderer.setClearColor(0xf6f6f6, 1);
+				document.getElementById('container').appendChild(renderer.domElement);
+
+				// 创建场景
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color(0xf6f6f6);
+
+				// 创建主相机
+				mainCamera = new THREE.PerspectiveCamera(
+					60,
+					window.innerWidth / window.innerHeight,
+					0.1,
+					1000
+				);
+				mainCamera.position.set(5, 5, 5);
+				mainCamera.lookAt(0, 0, 0);
+
+				// 创建小窗口相机
+				insetCamera = new THREE.PerspectiveCamera(
+					60,
+					1,
+					0.1,
+					1000
+				);
+
+				// 创建控制器
+				controls = new OrbitControls(mainCamera, renderer.domElement);
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.05;
+
+				// 添加光源
+				const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+				scene.add(ambientLight);
+
+				const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.6);
+				directionalLight1.position.set(1, 1, 1);
+				scene.add(directionalLight1);
+
+				const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+				directionalLight2.position.set(-1, -1, -1);
+				scene.add(directionalLight2);
+
+				// 创建测试模型（多个立方体）
+				const geometry = new THREE.BoxGeometry(1, 1, 1);
+				
+				// 创建多个不同颜色的立方体
+				const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+				for (let i = 0; i < 6; i++) {
+					const material = new THREE.MeshStandardMaterial({ 
+						color: colors[i],
+						metalness: 0.3,
+						roughness: 0.7
+					});
+					const mesh = new THREE.Mesh(geometry, material);
+					mesh.position.set(
+						(i - 2.5) * 2,
+						0,
+						0
+					);
+					scene.add(mesh);
+					meshes.push(mesh);
+				}
+
+				// 添加一个较大的中心物体
+				const centerGeometry = new THREE.SphereGeometry(1, 32, 32);
+				const centerMaterial = new THREE.MeshStandardMaterial({ 
+					color: 0x888888,
+					metalness: 0.5,
+					roughness: 0.5
+				});
+				const centerMesh = new THREE.Mesh(centerGeometry, centerMaterial);
+				centerMesh.position.set(0, 2, 0);
+				scene.add(centerMesh);
+				meshes.push(centerMesh);
+
+				// 添加网格辅助
+				const gridHelper = new THREE.GridHelper(20, 20);
+				scene.add(gridHelper);
+
+				// 添加坐标轴辅助
+				const axesHelper = new THREE.AxesHelper(5);
+				scene.add(axesHelper);
+
+				// 鼠标移动事件
+				window.addEventListener('mousemove', onMouseMove);
+				window.addEventListener('resize', onWindowResize);
+				
+				onWindowResize();
+				animate();
+			}
+
+			// 鼠标移动处理
+			function onMouseMove(event) {
+				// 将鼠标位置转换为归一化设备坐标
+				mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+				mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+				// 射线检测
+				raycaster.setFromCamera(mouse, mainCamera);
+				const intersects = raycaster.intersectObjects(meshes, true);
+
+				if (intersects.length > 0) {
+					hoveredIntersection = intersects[0];
+					showInset = true;
+					
+					// 更新小窗口中心图标位置
+					updateCrosshairPosition();
+				} else {
+					hoveredIntersection = null;
+					showInset = false;
+					crosshairElement.style.display = 'none';
+				}
+			}
+
+			// 更新小窗口中心图标位置
+			function updateCrosshairPosition() {
+				if (!showInset) return;
+				
+				// 计算小窗口中心位置（屏幕坐标）
+				// WebGL坐标系：原点在左下角，Y轴向上
+				// CSS坐标系：原点在左上角，Y轴向下
+				const containerRect = renderer.domElement.getBoundingClientRect();
+				const centerX = containerRect.left + insetX + insetSize / 2;
+				// insetY是WebGL坐标系（从底部），需要转换为CSS坐标系（从顶部）
+				const centerY = containerRect.top + (window.innerHeight - insetY - insetSize / 2);
+				
+				crosshairElement.style.left = centerX + 'px';
+				crosshairElement.style.top = centerY + 'px';
+				crosshairElement.style.display = 'block';
+			}
+
+			// 同步小窗口相机
+			function syncInsetCamera() {
+				if (!hoveredIntersection || !hoveredIntersection.point) {
+					// 没有目标点时，同步位置和旋转
+					insetCamera.position.copy(mainCamera.position);
+					insetCamera.quaternion.copy(mainCamera.quaternion);
+					insetCamera.up.copy(mainCamera.up);
+				} else {
+					// 有目标点时，聚焦到该点并放大
+					const targetPoint = hoveredIntersection.point;
+					const cameraPosition = mainCamera.position.clone();
+					const direction = new THREE.Vector3()
+						.subVectors(targetPoint, cameraPosition)
+						.normalize();
+					
+					// 计算从相机到目标点的距离
+					const distance = cameraPosition.distanceTo(targetPoint);
+					
+					// 将小窗口相机定位到更靠近目标点的位置（放大效果）
+					const insetDistance = distance / insetZoomFactor;
+					const newPosition = cameraPosition.clone()
+						.add(direction.multiplyScalar(distance - insetDistance));
+					
+					insetCamera.position.copy(newPosition);
+					insetCamera.up.copy(mainCamera.up);
+					insetCamera.lookAt(targetPoint);
+				}
+
+				// 同步相机属性
+				insetCamera.near = mainCamera.near;
+				insetCamera.far = mainCamera.far;
+
+				// 对于透视相机，通过增加 zoom 来放大模型
+				if (mainCamera instanceof THREE.PerspectiveCamera && insetCamera instanceof THREE.PerspectiveCamera) {
+					insetCamera.fov = mainCamera.fov;
+					insetCamera.zoom = mainCamera.zoom * insetZoomFactor;
+					
+					// 更新小窗口相机的宽高比
+					insetCamera.aspect = insetSize / insetSize; // 正方形
+				}
+
+				// 更新投影矩阵
+				insetCamera.updateProjectionMatrix();
+				insetCamera.updateMatrixWorld();
+			}
+
+			// 窗口大小调整
+			function onWindowResize() {
+				const width = window.innerWidth;
+				const height = window.innerHeight;
+
+				// 更新主相机
+				mainCamera.aspect = width / height;
+				mainCamera.updateProjectionMatrix();
+
+				// 更新渲染器
+				renderer.setSize(width, height);
+
+				// 计算小窗口尺寸
+				insetSize = height / 4; // 小窗口大小（正方形）
+				insetX = width - insetSize - 20; // 小窗口位置 X（右侧，WebGL坐标系）
+				// 小窗口位置 Y（顶部）：WebGL坐标系从底部开始，所以要计算从底部到顶部的距离
+				insetY = height - insetSize - 40; // 从底部算起，到小窗口底边的距离
+
+				// 更新小窗口相机宽高比
+				if (insetCamera instanceof THREE.PerspectiveCamera) {
+					insetCamera.aspect = insetSize / insetSize;
+					insetCamera.updateProjectionMatrix();
+				}
+			}
+
+			// 渲染循环
+			function animate() {
+				requestAnimationFrame(animate);
+
+				// 更新控制器
+				controls.update();
+
+				// 渲染主视图
+				renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+				renderer.render(scene, mainCamera);
+
+				// 渲染小窗口（如果显示）
+				if (showInset && hoveredIntersection) {
+					// 同步小窗口相机
+					syncInsetCamera();
+
+					// 保存当前状态
+					const currentClearColor = renderer.getClearColor(new THREE.Color());
+					const currentClearAlpha = renderer.getClearAlpha();
+
+					// 设置小窗口背景色
+					renderer.setClearColor(0x222222, 1);
+					renderer.clearDepth(); // 重要：清除深度缓冲区
+
+					// 启用裁剪测试
+					renderer.setScissorTest(true);
+					renderer.setScissor(insetX, insetY, insetSize, insetSize);
+					renderer.setViewport(insetX, insetY, insetSize, insetSize);
+
+					// 渲染场景到小窗口
+					renderer.render(scene, insetCamera);
+
+					// 恢复裁剪测试和视口
+					renderer.setScissorTest(false);
+					renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+
+					// 恢复清除颜色
+					renderer.setClearColor(currentClearColor, currentClearAlpha);
+
+					// 更新中心图标位置
+					updateCrosshairPosition();
+				}
+			}
+
+			// 启动
+			init();
+		</script>
+
+	</body>
+
+</html>
