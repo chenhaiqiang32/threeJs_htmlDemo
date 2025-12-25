@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>矩阵变换详解 - 坐标转换演示</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .code-explanation {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .code-explanation h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 15px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-line {
+            margin: 8px 0;
+            padding: 5px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .code-line:hover {
+            background: #3d3d3d;
+            border-left-color: #667eea;
+        }
+        
+        .line-number {
+            color: #858585;
+            margin-right: 15px;
+            display: inline-block;
+            width: 30px;
+        }
+        
+        .highlight {
+            background: rgba(102, 126, 234, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .explanation-item {
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .explanation-item h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .explanation-item p {
+            line-height: 1.8;
+            color: #555;
+        }
+        
+        .formula {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 1.2em;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .canvas-container {
+            width: 100%;
+            height: 600px;
+            background: #1a1a1a;
+            border-radius: 10px;
+            margin: 30px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            flex: 1;
+            min-width: 200px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .control-group .value-display {
+            text-align: center;
+            font-family: monospace;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .info-panel {
+            background: #e7f3ff;
+            border: 2px solid #2196F3;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        
+        .info-panel h3 {
+            color: #2196F3;
+            margin-bottom: 15px;
+        }
+        
+        .info-panel table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .info-panel table th,
+        .info-panel table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .info-panel table th {
+            background: #2196F3;
+            color: white;
+        }
+        
+        .step-by-step {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border: 2px solid #667eea;
+        }
+        
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔢 矩阵变换详解</h1>
+        <p class="subtitle">坐标转换中的矩阵运算原理与可视化演示</p>
+        
+        <div class="code-explanation">
+            <h2>📝 代码解析 (第186-189行)</h2>
+            <div class="code-block">
+                <div class="code-line">
+                    <span class="line-number">186</span>
+                    <span class="highlight">const initialMatrixInverse = new Matrix4();</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">187</span>
+                    <span class="highlight">initialMatrixInverse.copy(initialMatrix).invert();</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">188</span>
+                    <span class="highlight">const transformMatrix = new Matrix4();</span>
+                </div>
+                <div class="code-line">
+                    <span class="line-number">189</span>
+                    <span class="highlight">transformMatrix.multiplyMatrices(currentMatrix, initialMatrixInverse);</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="step-by-step">
+            <h2>🔍 逐步解析</h2>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>第186行：创建逆矩阵对象</strong>
+                <p>创建一个新的 4x4 矩阵对象，用于存储初始矩阵的逆矩阵。Matrix4 是 Three.js 中表示 4x4 变换矩阵的类，用于描述三维空间中的平移、旋转和缩放变换。</p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>第187行：计算初始矩阵的逆矩阵</strong>
+                <p>
+                    <code>copy(initialMatrix)</code> - 复制初始状态矩阵<br>
+                    <code>.invert()</code> - 计算逆矩阵
+                </p>
+                <div class="formula">
+                    如果 M 是初始矩阵，则 M⁻¹ 满足：M × M⁻¹ = I（单位矩阵）
+                </div>
+                <p><strong>含义：</strong>逆矩阵能够"撤销"原始变换。如果我们有一个点 P' = M × P（初始矩阵变换后的点），那么 P = M⁻¹ × P'（通过逆矩阵可以还原回原始点）。</p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>第188行：创建变换矩阵对象</strong>
+                <p>创建一个新的矩阵对象，用于存储从初始状态到当前状态的变换矩阵。这个矩阵将告诉我们如何将初始状态下的点转换到当前状态。</p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                <strong>第189行：计算变换矩阵</strong>
+                <p>
+                    <code>multiplyMatrices(currentMatrix, initialMatrixInverse)</code><br>
+                    将当前矩阵与初始矩阵的逆矩阵相乘
+                </p>
+                <div class="formula">
+                    transformMatrix = currentMatrix × initialMatrix⁻¹
+                </div>
+                <p><strong>数学含义：</strong></p>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>假设点在初始状态下的世界坐标为 P_initial</li>
+                    <li>点在当前状态下的世界坐标为 P_current</li>
+                    <li>P_initial = initialMatrix × P_local（局部坐标转初始世界坐标）</li>
+                    <li>P_current = currentMatrix × P_local（局部坐标转当前世界坐标）</li>
+                    <li>因此：P_current = currentMatrix × (initialMatrix⁻¹ × P_initial)</li>
+                    <li>即：P_current = (currentMatrix × initialMatrix⁻¹) × P_initial</li>
+                </ul>
+                <p><strong>实际效果：</strong>这个变换矩阵可以直接将初始状态下的世界坐标点转换为当前状态下的世界坐标点。</p>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>🎯 核心概念</h3>
+            <table>
+                <tr>
+                    <th>概念</th>
+                    <th>说明</th>
+                </tr>
+                <tr>
+                    <td><strong>initialMatrix</strong></td>
+                    <td>初始状态的变换矩阵（只包含位置和缩放，不含旋转）</td>
+                </tr>
+                <tr>
+                    <td><strong>currentMatrix</strong></td>
+                    <td>当前状态的变换矩阵（包含位置、旋转、缩放）</td>
+                </tr>
+                <tr>
+                    <td><strong>initialMatrix⁻¹</strong></td>
+                    <td>初始矩阵的逆矩阵（用于"撤销"初始变换）</td>
+                </tr>
+                <tr>
+                    <td><strong>transformMatrix</strong></td>
+                    <td>从初始状态到当前状态的变换矩阵（核心转换公式）</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="canvas-container" id="canvas-container"></div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>旋转角度 X (度)</label>
+                <input type="range" id="rotateX" min="0" max="360" value="0">
+                <div class="value-display" id="rotateXValue">0°</div>
+            </div>
+            <div class="control-group">
+                <label>旋转角度 Y (度)</label>
+                <input type="range" id="rotateY" min="0" max="360" value="0">
+                <div class="value-display" id="rotateYValue">0°</div>
+            </div>
+            <div class="control-group">
+                <label>旋转角度 Z (度)</label>
+                <input type="range" id="rotateZ" min="0" max="360" value="0">
+                <div class="value-display" id="rotateZValue">0°</div>
+            </div>
+            <div class="control-group">
+                <label>缩放比例</label>
+                <input type="range" id="scale" min="0.5" max="2" step="0.1" value="1">
+                <div class="value-display" id="scaleValue">1.0</div>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>📊 实时矩阵数据</h3>
+            <div id="matrix-info"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 场景设置
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a1a);
+        
+        const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const container = document.getElementById('canvas-container');
+        renderer.setSize(container.offsetWidth, container.offsetHeight);
+        container.appendChild(renderer.domElement);
+        
+        // 相机位置
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+        
+        // 添加网格
+        const gridHelper = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
+        scene.add(gridHelper);
+        
+        // 添加坐标轴
+        const axesHelper = new THREE.AxesHelper(3);
+        scene.add(axesHelper);
+        
+        // 初始状态的对象（立方体）
+        const initialGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const initialMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00ff00, 
+            transparent: true, 
+            opacity: 0.5,
+            wireframe: true
+        });
+        const initialCube = new THREE.Mesh(initialGeometry, initialMaterial);
+        initialCube.position.set(0, 0, 0);
+        scene.add(initialCube);
+        
+        // 当前状态的对象（立方体）
+        const currentGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const currentMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0xff6600,
+            wireframe: true
+        });
+        const currentCube = new THREE.Mesh(currentGeometry, currentMaterial);
+        currentCube.position.set(0, 0, 0);
+        scene.add(currentCube);
+        
+        // 测试点（在初始状态下的坐标）
+        const testPoints = [
+            new THREE.Vector3(1, 0, 0),   // 右侧点
+            new THREE.Vector3(0, 1, 0),   // 上方点
+            new THREE.Vector3(0, 0, 1),   // 前方点
+            new THREE.Vector3(-1, 0, 0),  // 左侧点
+            new THREE.Vector3(0, -1, 0),  // 下方点
+            new THREE.Vector3(0, 0, -1),  // 后方点
+        ];
+        
+        // 初始状态的点（绿色）
+        const initialPointSpheres = [];
+        testPoints.forEach((point, index) => {
+            const geometry = new THREE.SphereGeometry(0.1, 16, 16);
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.copy(point);
+            scene.add(sphere);
+            initialPointSpheres.push({ sphere, originalPoint: point.clone() });
+        });
+        
+        // 变换后的点（红色）
+        const transformedPointSpheres = [];
+        testPoints.forEach((point, index) => {
+            const geometry = new THREE.SphereGeometry(0.1, 16, 16);
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            const sphere = new THREE.Mesh(geometry, material);
+            scene.add(sphere);
+            transformedPointSpheres.push({ sphere, originalPoint: point.clone() });
+        });
+        
+        // 连接线
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
+        const lines = [];
+        testPoints.forEach(() => {
+            const geometry = new THREE.BufferGeometry();
+            const line = new THREE.Line(geometry, lineMaterial);
+            scene.add(line);
+            lines.push(line);
+        });
+        
+        // 控制滑块
+        const rotateXSlider = document.getElementById('rotateX');
+        const rotateYSlider = document.getElementById('rotateY');
+        const rotateZSlider = document.getElementById('rotateZ');
+        const scaleSlider = document.getElementById('scale');
+        
+        const rotateXValue = document.getElementById('rotateXValue');
+        const rotateYValue = document.getElementById('rotateYValue');
+        const rotateZValue = document.getElementById('rotateZValue');
+        const scaleValue = document.getElementById('scaleValue');
+        const matrixInfo = document.getElementById('matrix-info');
+        
+        // 更新函数
+        function update() {
+            const rotX = (rotateXSlider.value / 180) * Math.PI;
+            const rotY = (rotateYSlider.value / 180) * Math.PI;
+            const rotZ = (rotateZSlider.value / 180) * Math.PI;
+            const scale = parseFloat(scaleSlider.value);
+            
+            rotateXValue.textContent = rotateXSlider.value + '°';
+            rotateYValue.textContent = rotateYSlider.value + '°';
+            rotateZValue.textContent = rotateZSlider.value + '°';
+            scaleValue.textContent = scale.toFixed(1);
+            
+            // 更新当前立方体的变换
+            currentCube.rotation.set(rotX, rotY, rotZ);
+            currentCube.scale.set(scale, scale, scale);
+            currentCube.updateMatrixWorld();
+            
+            // === 核心代码逻辑 ===
+            // 1. 构建初始状态矩阵（无旋转，只有位置和缩放）
+            const initialTransform = {
+                position: new THREE.Vector3(0, 0, 0),
+                quaternion: new THREE.Quaternion(),
+                scale: new THREE.Vector3(1, 1, 1)
+            };
+            
+            const initialMatrix = new THREE.Matrix4();
+            initialMatrix.compose(
+                initialTransform.position,
+                initialTransform.quaternion, // 无旋转
+                initialTransform.scale
+            );
+            
+            // 2. 构建当前状态矩阵（包含旋转和缩放）
+            const currentMatrix = new THREE.Matrix4();
+            currentMatrix.compose(
+                currentCube.position,
+                new THREE.Quaternion().setFromEuler(currentCube.rotation),
+                currentCube.scale
+            );
+            
+            // 3. 计算逆矩阵（第186-187行）
+            const initialMatrixInverse = new THREE.Matrix4();
+            initialMatrixInverse.copy(initialMatrix).invert();
+            
+            // 4. 计算变换矩阵（第188-189行）
+            const transformMatrix = new THREE.Matrix4();
+            transformMatrix.multiplyMatrices(currentMatrix, initialMatrixInverse);
+            
+            // === 应用变换到点 ===
+            testPoints.forEach((point, index) => {
+                // 初始状态的点（绿色）
+                initialPointSpheres[index].sphere.position.copy(point);
+                
+                // 使用变换矩阵转换点（红色）
+                const transformedPoint = point.clone().applyMatrix4(transformMatrix);
+                transformedPointSpheres[index].sphere.position.copy(transformedPoint);
+                
+                // 绘制连接线
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                    point,
+                    transformedPoint
+                ]);
+                lines[index].geometry.dispose();
+                lines[index].geometry = lineGeometry;
+            });
+            
+            // 显示矩阵信息
+            displayMatrixInfo(initialMatrix, currentMatrix, initialMatrixInverse, transformMatrix);
+        }
+        
+        function displayMatrixInfo(initialMatrix, currentMatrix, initialMatrixInverse, transformMatrix) {
+            function formatMatrix(matrix, name) {
+                const elements = matrix.elements;
+                return `
+                    <h4 style="color: #667eea; margin-top: 15px;">${name}</h4>
+                    <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
+                        <tr>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[0].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[4].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[8].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[12].toFixed(3)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[1].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[5].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[9].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[13].toFixed(3)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[2].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[6].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[10].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[14].toFixed(3)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[3].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[7].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[11].toFixed(3)}</td>
+                            <td style="padding: 5px; font-family: monospace; background: #f0f0f0;">${elements[15].toFixed(3)}</td>
+                        </tr>
+                    </table>
+                `;
+            }
+            
+            matrixInfo.innerHTML = `
+                ${formatMatrix(initialMatrix, 'Initial Matrix (初始矩阵)')}
+                ${formatMatrix(currentMatrix, 'Current Matrix (当前矩阵)')}
+                ${formatMatrix(initialMatrixInverse, 'Initial Matrix⁻¹ (初始矩阵的逆)')}
+                ${formatMatrix(transformMatrix, 'Transform Matrix (变换矩阵) = Current × Initial⁻¹')}
+                <p style="margin-top: 15px; color: #666;">
+                    <strong>说明：</strong>绿色球体是初始状态的点，红色球体是通过变换矩阵转换后的点。
+                    黄色线条连接对应的点，展示变换的效果。
+                </p>
+            `;
+        }
+        
+        // 事件监听
+        rotateXSlider.addEventListener('input', update);
+        rotateYSlider.addEventListener('input', update);
+        rotateZSlider.addEventListener('input', update);
+        scaleSlider.addEventListener('input', update);
+        
+        // 鼠标控制
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        
+        container.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+        
+        container.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            const deltaX = e.clientX - previousMousePosition.x;
+            const deltaY = e.clientY - previousMousePosition.y;
+            
+            const spherical = new THREE.Spherical();
+            spherical.setFromVector3(camera.position);
+            spherical.theta -= deltaX * 0.01;
+            spherical.phi += deltaY * 0.01;
+            spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+            
+            camera.position.setFromSpherical(spherical);
+            camera.lookAt(0, 0, 0);
+            
+            previousMousePosition = { x: e.clientX, y: e.clientY };
+        });
+        
+        container.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const scale = e.deltaY > 0 ? 1.1 : 0.9;
+            camera.position.multiplyScalar(scale);
+        });
+        
+        // 响应式
+        window.addEventListener('resize', () => {
+            camera.aspect = container.offsetWidth / container.offsetHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.offsetWidth, container.offsetHeight);
+        });
+        
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        
+        // 初始更新
+        update();
+        animate();
+    </script>
+</body>
+</html>
+
